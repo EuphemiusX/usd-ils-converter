@@ -21,6 +21,7 @@ ChartJS.register(
 );
 
 const BASE_API = 'https://api.exchangerate.host';
+const ACCESS_KEY = 'b40b67727d3fc511ca13277ec60a5da9';
 
 export default function App() {
   const [amount, setAmount] = useState('1000');
@@ -41,14 +42,17 @@ export default function App() {
     setLoading(true);
 
     try {
-      const latestRes = await fetch(`${BASE_API}/latest?base=${fromCurrency}&symbols=${toCurrency}`);
+      const latestRes = await fetch(`${BASE_API}/latest?base=${fromCurrency}&symbols=${toCurrency}&access_key=${ACCESS_KEY}`);
       const latestData = await latestRes.json();
+
+      if (!latestData.success) throw new Error('API error');
+
       const latestRate = latestData.rates[toCurrency];
       setConverted((parseFloat(amount) * latestRate).toFixed(2));
 
       const years = [...Array(10)].map((_, i) => new Date().getFullYear() - i);
       const requests = years.map((year) =>
-        fetch(`${BASE_API}/${year}-06-01?base=${fromCurrency}&symbols=${toCurrency}`)
+        fetch(`${BASE_API}/${year}-06-01?base=${fromCurrency}&symbols=${toCurrency}&access_key=${ACCESS_KEY}`)
       );
       const responses = await Promise.all(requests);
       const data = await Promise.all(responses.map((r) => r.json()));
@@ -64,6 +68,7 @@ export default function App() {
 
       setHistoricalData(chartData);
     } catch (err) {
+      console.error(err);
       setError('Error fetching exchange data');
     } finally {
       setLoading(false);
