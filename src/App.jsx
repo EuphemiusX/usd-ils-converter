@@ -20,8 +20,8 @@ ChartJS.register(
   Legend
 );
 
-const BASE_API = 'https://api.exchangerate.host';
-const ACCESS_KEY = 'b40b67727d3fc511ca13277ec60a5da9';
+const API_BASE = 'https://api.apilayer.com/exchangerates_data';
+const API_KEY = 'b40b67727d3fc511ca13277ec60a5da9';
 
 export default function App() {
   const [amount, setAmount] = useState('1000');
@@ -31,6 +31,14 @@ export default function App() {
   const [historicalData, setHistoricalData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const fetchWithHeaders = (url) => {
+    return fetch(url, {
+      headers: {
+        apikey: API_KEY,
+      },
+    });
+  };
 
   const handleConvert = async () => {
     if (!amount || isNaN(amount)) {
@@ -42,7 +50,9 @@ export default function App() {
     setLoading(true);
 
     try {
-      const latestRes = await fetch(`${BASE_API}/latest?base=${fromCurrency}&symbols=${toCurrency}&access_key=${ACCESS_KEY}`);
+      const latestRes = await fetchWithHeaders(
+        `${API_BASE}/latest?base=${fromCurrency}&symbols=${toCurrency}`
+      );
       const latestData = await latestRes.json();
 
       if (!latestData.success) throw new Error('API error');
@@ -52,7 +62,9 @@ export default function App() {
 
       const years = [...Array(10)].map((_, i) => new Date().getFullYear() - i);
       const requests = years.map((year) =>
-        fetch(`${BASE_API}/${year}-06-01?base=${fromCurrency}&symbols=${toCurrency}&access_key=${ACCESS_KEY}`)
+        fetchWithHeaders(
+          `${API_BASE}/${year}-06-01?base=${fromCurrency}&symbols=${toCurrency}`
+        )
       );
       const responses = await Promise.all(requests);
       const data = await Promise.all(responses.map((r) => r.json()));
