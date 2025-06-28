@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Chart as ChartJS,
   LineElement,
@@ -23,50 +23,58 @@ ChartJS.register(
 const BASE_API = 'https://api.exchangerate.host';
 
 export default function App() {
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('1000');
   const [fromCurrency, setFromCurrency] = useState('USD');
   const [toCurrency, setToCurrency] = useState('ILS');
   const [converted, setConverted] = useState(null);
   const [historicalData, setHistoricalData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (amount && !isNaN(amount)) {
-      fetchLatestRate();
-      fetchHistoricalRates();
+  const handleConvert = async () => {
+    if (!amount || isNaN(amount)) {
+      setError('Please enter a valid number');
+      return;
     }
-  }, [amount, fromCurrency]);
 
-  const fetchLatestRate = async () => {
-    const res = await fetch(`${BASE_API}/latest?base=${fromCurrency}&symbols=${toCurrency}`);
-    const data = await res.json();
-    const rate = data.rates[toCurrency];
-    setConverted((parseFloat(amount) * rate).toFixed(2));
-  };
+    setError('');
+    setLoading(true);
 
-  const fetchHistoricalRates = async () => {
-    const years = [...Array(10)].map((_, i) => new Date().getFullYear() - i);
-    const requests = years.map((year) =>
-      fetch(`${BASE_API}/${year}-06-01?base=${fromCurrency}&symbols=${toCurrency}`)
-    );
-    const responses = await Promise.all(requests);
-    const data = await Promise.all(responses.map((r) => r.json()));
+    try {
+      const latestRes = await fetch(`${BASE_API}/latest?base=${fromCurrency}&symbols=${toCurrency}`);
+      const latestData = await latestRes.json();
+      const latestRate = latestData.rates[toCurrency];
+      setConverted((parseFloat(amount) * latestRate).toFixed(2));
 
-    const chartData = data.map((d, i) => {
-      const rate = d.rates[toCurrency];
-      return {
-        year: years[i],
-        rate: rate,
-        converted: (parseFloat(amount) * rate).toFixed(2),
-      };
-    }).reverse();
+      const years = [...Array(10)].map((_, i) => new Date().getFullYear() - i);
+      const requests = years.map((year) =>
+        fetch(`${BASE_API}/${year}-06-01?base=${fromCurrency}&symbols=${toCurrency}`)
+      );
+      const responses = await Promise.all(requests);
+      const data = await Promise.all(responses.map((r) => r.json()));
 
-    setHistoricalData(chartData);
+      const chartData = data.map((d, i) => {
+        const rate = d.rates[toCurrency];
+        return {
+          year: years[i],
+          rate: rate,
+          converted: (parseFloat(amount) * rate).toFixed(2),
+        };
+      }).reverse();
+
+      setHistoricalData(chartData);
+    } catch (err) {
+      setError('Error fetching exchange data');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAmountChange = (e) => setAmount(e.target.value);
   const handleFromChange = (e) => {
-    setFromCurrency(e.target.value);
-    setToCurrency(e.target.value === 'USD' ? 'ILS' : 'USD');
+    const val = e.target.value;
+    setFromCurrency(val);
+    setToCurrency(val === 'USD' ? 'ILS' : 'USD');
   };
 
   const chartOptions = {
@@ -100,18 +108,31 @@ export default function App() {
     <div className="container">
       <h1>USD / ILS Currency Tracker</h1>
       <div className="form">
-        <input type="number" value={amount} onChange={handleAmountChange} placeholder="Enter amount" />
+        <input
+          type="number"
+          value={amount}
+          onChange={handleAmountChange}
+          placeholder="Enter amount"
+        />
         <select value={fromCurrency} onChange={handleFromChange}>
           <option value="USD">USD</option>
           <option value="ILS">ILS</option>
         </select>
+        <button onClick={handleConvert}>Convert</button>
       </div>
-      {converted && (
+
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      {converted && !loading && (
         <p>
           Converted: <strong>{converted} {toCurrency}</strong>
         </p>
       )}
-      {historicalData.length > 0 && <Line data={chartData} options={chartOptions} />}
+
+      {loading && <p>Loading data...</p>}
+
+      {historicalData.length > 0 && !loading && (
+        <Line data={chartData} options={chartOptions} />
+      )}
     </div>
   );
 }
